@@ -21,7 +21,10 @@ def create_pyramid_chart(
         show_y_right_line,
         # Style: Ticks
         x_tick_direction, x_tick_len,
-        y_tick_direction, y_tick_len
+        y_tick_direction, y_tick_len,
+        
+        # --- ⬇️ 新增参数 ⬇️ ---
+        use_manual_xaxis, manual_xaxis_max 
 ):
     """
     使用 Plotly 创建人口金字塔图表
@@ -71,19 +74,33 @@ def create_pyramid_chart(
     fig.add_trace(go.Bar(
         y=age_groups, x=df[right_col], name=right_name, orientation='h',
         marker=dict(color=right_color), text=df[right_col],
-        texttemplate='%{text:.2f}%', textposition='outside'
+        texttemplate='%{text:.2f}%', 
+        textposition='outside',
+        # --- ⬇️ 强烈建议：添加此行以修复 0 值标签重叠问题 ⬇️ ---
+        outsidetextanchor='start' 
     ))
     # --- ⬇️ 修复：将 .1f 修改为 .2f ⬇️ ---
     fig.add_trace(go.Bar(
         y=age_groups, x=df['plot_left'], name=left_name, orientation='h',
         marker=dict(color=left_color), text=df[left_col],
-        texttemplate='%{text:.2f}%', textposition='outside'
+        texttemplate='%{text:.2f}%', 
+        textposition='outside',
+        # --- ⬇️ 强烈建议：添加此行以修复 0 值标签重叠问题 ⬇️ ---
+        outsidetextanchor='end'
     ))
 
-    # --- 6. 动态计算 X 轴范围 ---
-    max_val = max(df[left_col].max(), df[right_col].max())
-    tick_max = (int(max_val / 2) + 1) * 2
-    tick_step = 2
+    # --- ⬇️ 第 6 步：已修改为支持手动/自动模式 ⬇️ ---
+    tick_step = 2  # 刻度步长（例如 2%, 4%, 6%）
+    
+    if use_manual_xaxis:
+        # 使用用户手动设置的最大值
+        tick_max = manual_xaxis_max
+    else:
+        # 原始的自动计算逻辑
+        max_val = max(df[left_col].max(), df[right_col].max())
+        tick_max = (int(max_val / tick_step) + 1) * tick_step # 向上取整到最近的步长
+    
+    # --- (此部分无需修改) ---
     positive_ticks = list(range(tick_step, tick_max + 1, tick_step))
     negative_ticks = [-v for v in positive_ticks]
     tick_vals = negative_ticks[::-1] + [0] + positive_ticks
@@ -196,7 +213,7 @@ right_color = st.sidebar.color_picker("右侧颜色", "#EF4444", key="right_colo
 # 4. 自定义图表样式 (字体/尺寸)
 st.sidebar.subheader("4. 自定义图表样式")
 font_family = st.sidebar.text_input("全局字体", "SimHei, Arial",
-                                    help="""
+                                  help="""
                                   输入 CSS 字体。
                                   - 中文推荐: SimHei (黑体), Songti (宋体)
                                   - 英文推荐: Arial, Times New Roman
@@ -235,6 +252,14 @@ with col_x_tick:
 with col_x_tick_len:
     x_tick_len = st.slider("X轴刻度长", 0, 20, 5, key="x_tick_len")
 
+# --- ⬇️ 新增：X轴最大值控制 ⬇️ ---
+st.sidebar.markdown("**X轴范围 (统一度量衡)**")
+use_manual_xaxis = st.sidebar.checkbox("手动设置X轴最大值", False, key="use_manual_xaxis", 
+                                     help="勾选此项以手动设置X轴的最大值（例如：10%），用于统一度量衡。")
+manual_xaxis_max = st.sidebar.number_input("X轴最大值 (%)", min_value=2, max_value=100, value=10, step=2, key="manual_xaxis_max",
+                                         help="请输入一个偶数（例如 8, 10, 12），以匹配2%的刻度步长。")
+
+# --- (Y轴部分无需修改) ---
 st.sidebar.markdown("**Y轴 (左侧/右侧)**")
 col_y_grid1, col_y_grid2, col_y_grid3 = st.sidebar.columns([1, 2, 1])
 with col_y_grid1:
@@ -305,9 +330,17 @@ if uploaded_file is not None:
                 show_y_left_line, y_left_line_color, y_left_line_width,
                 show_y_right_line,
                 x_tick_direction, x_tick_len,
-                y_tick_direction, y_tick_len
+                y_tick_direction, y_tick_len,
+                
+                # --- ⬇️ 传递新参数 ⬇️ ---
+                use_manual_xaxis=use_manual_xaxis,
+                manual_xaxis_max=manual_xaxis_max
             )
-            st.plotly_chart(fig, use_container_width=True)
+            
+            # --- ⬇️ 强烈建议：修复 Streamlit 警告 ⬇️ ---
+            # st.plotly_chart(fig, use_container_width=True)
+            st.plotly_chart(fig, width='stretch') # 替换为 'width'
+
 
             # --- 导出图表功能 (已更新) ---
             st.subheader("导出图表")
@@ -332,7 +365,7 @@ if uploaded_file is not None:
             img_svg = fig.to_image(format="svg", width=calc_export_width, height=calc_export_height)
             img_pdf = fig.to_image(format="pdf", width=calc_export_width, height=calc_export_height)
             img_png = fig.to_image(format="png", width=calc_export_width, height=calc_export_height,
-                                   scale=png_scale_factor)
+                                 scale=png_scale_factor)
 
             col1, col2, col3 = st.columns(3)
             with col1:
