@@ -23,7 +23,7 @@ def create_pyramid_chart(
         x_tick_direction, x_tick_len,
         y_tick_direction, y_tick_len,
         
-        # --- ⬇️ 新增参数 ⬇️ ---
+        # --- (新增参数，保持不变) ---
         use_manual_xaxis, manual_xaxis_max 
 ):
     """
@@ -41,7 +41,6 @@ def create_pyramid_chart(
 
     # --- 修复 2：创建手动画线 (shapes) 来形成一个完美的方框 ---
     layout_shapes = []
-    # (使用 'paper' 坐标系, (0,0) 是左下角, (1,1) 是右上角)
     if show_x_bottom_line:
         layout_shapes.append(go.layout.Shape(
             type="line", xref="paper", yref="paper", x0=0, y0=0, x1=1, y1=0,
@@ -50,7 +49,7 @@ def create_pyramid_chart(
     if show_x_top_line:
         layout_shapes.append(go.layout.Shape(
             type="line", xref="paper", yref="paper", x0=0, y0=1, x1=1, y1=1,
-            line=dict(color=x_bottom_line_color, width=x_bottom_line_width)  # 复用底线样式
+            line=dict(color=x_bottom_line_color, width=x_bottom_line_width) 
         ))
     if show_y_left_line:
         layout_shapes.append(go.layout.Shape(
@@ -60,7 +59,7 @@ def create_pyramid_chart(
     if show_y_right_line:
         layout_shapes.append(go.layout.Shape(
             type="line", xref="paper", yref="paper", x0=1, y0=0, x1=1, y1=1,
-            line=dict(color=y_left_line_color, width=y_left_line_width)  # 复用左线样式
+            line=dict(color=y_left_line_color, width=y_left_line_width) 
         ))
 
     # --- 1-5 步：数据处理和图表创建 ---
@@ -70,27 +69,25 @@ def create_pyramid_chart(
     age_groups = list(df[age_col])
     fig = go.Figure()
 
-    # --- ⬇️ 修复：将 .1f 修改为 .2f ⬇️ ---
+    # --- ⬇️ 错误修复：使用 'inside' 和 'insidetextanchor' ⬇️ ---
     fig.add_trace(go.Bar(
         y=age_groups, x=df[right_col], name=right_name, orientation='h',
         marker=dict(color=right_color), text=df[right_col],
         texttemplate='%{text:.2f}%', 
-        textposition='outside',
-        # --- ⬇️ 强烈建议：添加此行以修复 0 值标签重叠问题 ⬇️ ---
-        outsidetextanchor='start' 
+        textposition='inside',      # 修改：移到内部
+        insidetextanchor='start'  # 修改：使用 'start' (左对齐)
     ))
-    # --- ⬇️ 修复：将 .1f 修改为 .2f ⬇️ ---
+    # --- ⬇️ 错误修复：使用 'inside' 和 'insidetextanchor' ⬇️ ---
     fig.add_trace(go.Bar(
         y=age_groups, x=df['plot_left'], name=left_name, orientation='h',
         marker=dict(color=left_color), text=df[left_col],
         texttemplate='%{text:.2f}%', 
-        textposition='outside',
-        # --- ⬇️ 强烈建议：添加此行以修复 0 值标签重叠问题 ⬇️ ---
-        outsidetextanchor='end'
+        textposition='inside',      # 修改：移到内部
+        insidetextanchor='end'    # 修改：使用 'end' (右对齐)
     ))
 
-    # --- ⬇️ 第 6 步：已修改为支持手动/自动模式 ⬇️ ---
-    tick_step = 2  # 刻度步长（例如 2%, 4%, 6%）
+    # --- 第 6 步：已修改为支持手动/自动模式 ---
+    tick_step = 2 
     
     if use_manual_xaxis:
         # 使用用户手动设置的最大值
@@ -98,9 +95,8 @@ def create_pyramid_chart(
     else:
         # 原始的自动计算逻辑
         max_val = max(df[left_col].max(), df[right_col].max())
-        tick_max = (int(max_val / tick_step) + 1) * tick_step # 向上取整到最近的步长
+        tick_max = (int(max_val / tick_step) + 1) * tick_step 
     
-    # --- (此部分无需修改) ---
     positive_ticks = list(range(tick_step, tick_max + 1, tick_step))
     negative_ticks = [-v for v in positive_ticks]
     tick_vals = negative_ticks[::-1] + [0] + positive_ticks
@@ -108,67 +104,40 @@ def create_pyramid_chart(
 
     # --- 7. 更新图表布局 (学术风格) ---
     fig.update_layout(
-        # 字体和标题
         title=dict(text=title, x=0.5, font=dict(size=title_font_size)),
         font=dict(size=global_font_size, family=font_family),
-
-        # 布局调整 (更紧凑)
-        margin=dict(l=80, r=40, t=80, b=50),  # 减小左右边距
-
+        margin=dict(l=80, r=40, t=80, b=50),  
         xaxis_title="人口百分比",
         yaxis_title=age_col,
-
-        # Y 轴 (左侧/右侧)
         yaxis=dict(
             categoryorder='array', categoryarray=age_groups,
-            # 网格
             showgrid=show_y_grid, gridcolor=y_grid_color, gridwidth=y_grid_width,
-
-            # 移除 showline 和 mirror
-            showline=False,  # 使用 shapes 代替
-            mirror=False,  # 使用 shapes 代替
-
-            # 刻度线 (使用修复后的变量)
+            showline=False, 
+            mirror=False,   
             ticks=y_tick_val,
             ticklen=y_tick_len
         ),
-
-        # X 轴 (底部/顶部)
         xaxis=dict(
             tickvals=tick_vals, ticktext=tick_text,
-            # 范围 (更紧凑)
-            range=[-tick_max * 1.15, tick_max * 1.15],  # 1.2 -> 1.15
-            # 网格
+            range=[-tick_max * 1.15, tick_max * 1.15],  
             showgrid=show_x_grid, gridcolor=x_grid_color, gridwidth=x_grid_width,
-
-            # 移除 showline 和 mirror
-            showline=False,  # 使用 shapes 代替
-            mirror=False,  # 使用 shapes 代替
-
-            # 刻度线 (使用修复后的变量)
+            showline=False,  
+            mirror=False,  
             ticks=x_tick_val,
             ticklen=x_tick_len,
-            # 中心零线 (硬编码)
             zeroline=True,
             zerolinecolor="#AAAAAA",
             zerolinewidth=1.5
         ),
-
-        # 坐标轴标题字号
         yaxis_title_font=dict(size=label_font_size),
         xaxis_title_font=dict(size=label_font_size),
-
-        # 坐标轴刻度字号
         yaxis_tickfont=dict(size=tick_font_size),
         xaxis_tickfont=dict(size=tick_font_size),
-
         barmode='relative',
         legend=dict(orientation='h', yanchor='bottom', y=1.02, xanchor='right', x=1),
         plot_bgcolor='white',
         paper_bgcolor='white',
         bargap=0.1,
-
-        # 添加手动绘制的方框
         shapes=layout_shapes
     )
 
@@ -252,7 +221,7 @@ with col_x_tick:
 with col_x_tick_len:
     x_tick_len = st.slider("X轴刻度长", 0, 20, 5, key="x_tick_len")
 
-# --- ⬇️ 新增：X轴最大值控制 ⬇️ ---
+# --- 新增：X轴最大值控制 ---
 st.sidebar.markdown("**X轴范围 (统一度量衡)**")
 use_manual_xaxis = st.sidebar.checkbox("手动设置X轴最大值", False, key="use_manual_xaxis", 
                                      help="勾选此项以手动设置X轴的最大值（例如：10%），用于统一度量衡。")
@@ -332,14 +301,14 @@ if uploaded_file is not None:
                 x_tick_direction, x_tick_len,
                 y_tick_direction, y_tick_len,
                 
-                # --- ⬇️ 传递新参数 ⬇️ ---
+                # --- 传递新参数 ---
                 use_manual_xaxis=use_manual_xaxis,
                 manual_xaxis_max=manual_xaxis_max
             )
             
-            # --- ⬇️ 强烈建议：修复 Streamlit 警告 ⬇️ ---
-            # st.plotly_chart(fig, use_container_width=True)
-            st.plotly_chart(fig, width='stretch') # 替换为 'width'
+            # --- 修复 Streamlit 警告 ---
+            st.plotly_chart(fig, use_container_width=True) # <-- 如果您回滚了，请确保修复这里
+            # st.plotly_chart(fig, width='stretch') # 建议使用这个
 
 
             # --- 导出图表功能 (已更新) ---
